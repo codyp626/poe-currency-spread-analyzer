@@ -1,0 +1,31 @@
+name: Fetch PoE Data
+
+on:
+  schedule:
+    # Every hour at minute 5
+    - cron: '5 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch currency data
+        run: |
+          curl -s -f "https://poeez.com/api/Economy/pc/Mirage" -o data.json
+          # Validate it's real JSON with a summary key
+          python3 -c "import json; d=json.load(open('data.json')); assert 'summary' in d, 'missing summary'"
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data.json
+          # Only commit if there are actual changes
+          git diff --cached --quiet || git commit -m "Update currency data $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git push
