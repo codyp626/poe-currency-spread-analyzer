@@ -25,20 +25,26 @@ Finds items where buying with chaos and selling for divines yields profit after 
 
 ## Deployment
 
-This is a single static HTML file — no build step required.
+This is a single static HTML file powered by a GitHub Actions workflow that fetches data hourly — no build step, no CORS proxies, no external dependencies.
 
 ### GitHub Pages
 1. Push this repo to GitHub
-2. Go to Settings → Pages
-3. Set source to "Deploy from a branch" → `main` / `/ (root)`
-4. Your site will be live at `https://<username>.github.io/<repo-name>/`
+2. Go to **Settings → Pages** → set source to `main` / `/ (root)`
+3. Go to **Settings → Actions → General** → under "Workflow permissions", select **"Read and write permissions"** and save
+4. Go to the **Actions** tab → click **"Fetch PoE Data"** → click **"Run workflow"** to do the first data fetch
+5. Your site will be live at `https://<username>.github.io/<repo-name>/`
+
+The workflow runs every hour automatically, fetching fresh data from poeez.com via `curl` (server-side, no CORS issues) and committing `data.json` to the repo. The app reads that static file.
 
 ### Local
-Just open `index.html` in a browser.
+Just open `index.html` in a browser. It will look for `data.json` in the same folder — you can grab it manually:
+```bash
+curl -o data.json "https://poeez.com/api/Economy/pc/Mirage"
+```
 
 ## Data Source
 
-All data comes from [poeez.com](https://poeez.com/api/Economy/pc/Mirage). The endpoint is the Mirage league on PC. To change leagues, modify the `API_URL` constant at the top of the script section.
+All data comes from [poeez.com](https://poeez.com/api/Economy/pc/Mirage). The endpoint is the Mirage league on PC. To change leagues, modify the API URL in both `index.html` (the `DATA_URL` won't change, but update the manual upload link) and `.github/workflows/fetch-data.yml`.
 
 ## License
 

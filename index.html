@@ -571,8 +571,10 @@ tbody td {
 </div>
 
 <script>
-const API_URL = 'https://poeez.com/api/Economy/pc/Mirage';
-const REFRESH_MS = 60 * 60 * 1000; // 1 hour
+// Data is fetched hourly by GitHub Actions and committed as data.json.
+// The app just reads that static file — no CORS issues.
+const DATA_URL = 'data.json';
+const REFRESH_MS = 60 * 60 * 1000; // re-check for new data every hour
 
 let rawData = null;
 let divineInChaos = { bid: 0, ask: 0 };
@@ -587,17 +589,53 @@ let minVolume = 50;
 
 // ─── Data Fetching ───
 async function fetchData() {
-  setStatus('loading', 'Fetching data…');
+  setStatus('loading', 'Loading data…');
   try {
-    const res = await fetch(API_URL);
+    const res = await fetch(DATA_URL + '?t=' + Date.now()); // cache-bust
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    rawData = await res.json();
+    const text = await res.text();
+    rawData = JSON.parse(text);
+    if (!rawData.summary) throw new Error('Invalid data structure');
     processData();
     setStatus('ok', `Updated ${formatTime(rawData.timestamp)}`);
   } catch (err) {
-    setStatus('error', `Error: ${err.message}`);
-    console.error(err);
+    console.warn('Failed to load data.json:', err.message);
+    setStatus('error', 'Could not load data. Upload JSON manually.');
+    showManualUpload(err);
   }
+}
+
+function showManualUpload(err) {
+  const container = document.getElementById('tableContainer');
+  container.innerHTML = `
+    <div class="loading-state" style="padding:3rem 2rem;">
+      <p style="margin-bottom:1rem;color:var(--loss-red);">Could not load data.json</p>
+      <p style="margin-bottom:1.5rem;color:var(--text-secondary);font-size:0.75rem;">
+        ${err ? err.message : 'Unknown error'}. The GitHub Actions workflow may not have run yet.<br>
+        You can manually load the data:
+      </p>
+      <p style="margin-bottom:0.5rem;">
+        <a href="https://poeez.com/api/Economy/pc/Mirage" target="_blank" style="color:var(--divine-purple);">1. Open API in new tab</a> → Save as .json
+      </p>
+      <label style="display:inline-block;padding:0.5rem 1.2rem;background:var(--divine-purple);color:#fff;border-radius:6px;cursor:pointer;font-family:'Geist Mono',monospace;font-size:0.8rem;">
+        2. Load JSON File
+        <input type="file" accept=".json,application/json" style="display:none;" id="manualFileInput">
+      </label>
+    </div>
+  `;
+  document.getElementById('manualFileInput')?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      rawData = JSON.parse(text);
+      if (!rawData.summary) throw new Error('JSON missing "summary" key');
+      processData();
+      setStatus('ok', `Loaded from file (${formatTime(rawData.timestamp)})`);
+    } catch (err) {
+      setStatus('error', `Bad file: ${err.message}`);
+    }
+  });
 }
 
 function setStatus(state, text) {
