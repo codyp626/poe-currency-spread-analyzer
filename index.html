@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PoE Mirage — Currency Spread Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-deep: #0a0a0f;
+  --bg-panel: #12121a;
+  --bg-row: #16161f;
+  --bg-row-hover: #1c1c2a;
+  --bg-row-alt: #131319;
+  --border: #2a2a3a;
+  --border-glow: #3d3d5c;
+  --text-primary: #e8e8f0;
+  --text-secondary: #8888a0;
+  --text-dim: #555570;
+  --chaos-gold: #f0c040;
+  --chaos-dark: #a08020;
+  --divine-purple: #c060ff;
+  --divine-dark: #7030a0;
+  --profit-green: #40e080;
+  --profit-green-dim: #20a050;
+  --loss-red: #ff4060;
+  --accent-blue: #4080ff;
+  --accent-cyan: #40d0e0;
+}
+
+html { font-size: 14px; }
+
+body {
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: 'Outfit', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Grain overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.app-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+/* ─── Header ─── */
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.header-left h1 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  background: linear-gradient(135deg, var(--chaos-gold), var(--divine-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.header-left .subtitle {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin-top: 0.4rem;
+  font-family: 'Geist Mono', monospace;
+}
+
+.header-right {
+  text-align: right;
+}
+
+.status-line {
+  font-family: 'Geist Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--profit-green);
+  margin-right: 4px;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.status-dot.error { background: var(--loss-red); animation: none; }
+.status-dot.loading { background: var(--chaos-gold); }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.divine-rate {
+  font-family: 'Geist Mono', monospace;
+  font-size: 0.85rem;
+  color: var(--divine-purple);
+  margin-top: 0.25rem;
+}
+
+/* ─── Controls ─── */
+.controls {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.control-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.btn-group {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.btn-group button {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 0.4rem 0.8rem;
+  font-family: 'Geist Mono', monospace;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  border-right: 1px solid var(--border);
+}
+
+.btn-group button:last-child { border-right: none; }
+
+.btn-group button:hover { background: var(--bg-row-hover); color: var(--text-primary); }
+
+.btn-group button.active {
+  background: var(--divine-purple);
+  color: #fff;
+}
+
+input.search-input {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  padding: 0.4rem 0.8rem;
+  font-family: 'Geist Mono', monospace;
+  font-size: 0.75rem;
+  width: 220px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+input.search-input:focus { border-color: var(--divine-purple); }
+
+input.search-input::placeholder { color: var(--text-dim); }
+
+.min-volume-input {
+  width: 80px !important;
+}
+
+/* ─── Summary Cards ─── */
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.summary-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.summary-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+}
+
+.summary-card.chaos-card::before { background: var(--chaos-gold); }
+.summary-card.divine-card::before { background: var(--divine-purple); }
+.summary-card.profit-card::before { background: var(--profit-green); }
+.summary-card.arb-card::before { background: var(--accent-cyan); }
+
+.summary-card .card-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+
+.summary-card .card-value {
+  font-family: 'Geist Mono', monospace;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.summary-card .card-sub {
+  font-family: 'Geist Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  margin-top: 0.2rem;
+}
+
+/* ─── Table ─── */
+.table-wrapper {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-panel);
+}
+
+.table-section-header {
+  padding: 0.8rem 1.2rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  background: var(--bg-deep);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.table-section-header .count-badge {
+  background: var(--border);
+  color: var(--text-secondary);
+  border-radius: 10px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 500;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+thead th {
+  text-align: left;
+  padding: 0.6rem 0.8rem;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: color 0.15s;
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel);
+  z-index: 2;
+}
+
+thead th:hover { color: var(--text-primary); }
+
+thead th.sorted { color: var(--divine-purple); }
+
+thead th .sort-arrow {
+  display: inline-block;
+  margin-left: 3px;
+  font-size: 0.6rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+thead th.sorted .sort-arrow { opacity: 1; }
+
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+
+tbody tr:nth-child(even) { background: var(--bg-row-alt); }
+tbody tr:hover { background: var(--bg-row-hover); }
+
+tbody td {
+  padding: 0.55rem 0.8rem;
+  font-family: 'Geist Mono', monospace;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.col-name { width: 24%; }
+.col-num { width: 9.5%; text-align: right; }
+.col-spread { width: 10%; text-align: right; }
+.col-pct { width: 8%; text-align: right; }
+.col-vol { width: 8%; text-align: right; }
+.col-type { width: 7%; text-align: center; }
+
+.item-name {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 500;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+
+.currency-tag {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.tag-chaos {
+  background: rgba(240, 192, 64, 0.12);
+  color: var(--chaos-gold);
+  border: 1px solid rgba(240, 192, 64, 0.2);
+}
+
+.tag-divine {
+  background: rgba(192, 96, 255, 0.12);
+  color: var(--divine-purple);
+  border: 1px solid rgba(192, 96, 255, 0.2);
+}
+
+.tag-arb {
+  background: rgba(64, 208, 224, 0.12);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(64, 208, 224, 0.2);
+}
+
+.val-bid { color: var(--profit-green); }
+.val-ask { color: var(--loss-red); }
+
+.val-spread-positive { color: var(--profit-green); font-weight: 600; }
+.val-spread-negative { color: var(--loss-red); font-weight: 600; }
+
+.pct-badge {
+  display: inline-block;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.pct-high {
+  background: rgba(64, 224, 128, 0.12);
+  color: var(--profit-green);
+}
+
+.pct-mid {
+  background: rgba(240, 192, 64, 0.12);
+  color: var(--chaos-gold);
+}
+
+.pct-low {
+  background: rgba(136, 136, 160, 0.1);
+  color: var(--text-secondary);
+}
+
+/* ─── Loading & Empty ─── */
+.loading-state, .empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--text-dim);
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--divine-purple);
+  border-radius: 50%;
+  margin: 0 auto 1rem;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-state p { font-family: 'Geist Mono', monospace; font-size: 0.8rem; }
+
+/* ─── Tabs ─── */
+.tab-bar {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  padding: 0.6rem 1.2rem;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  margin-bottom: -1px;
+}
+
+.tab-btn:hover { color: var(--text-secondary); }
+
+.tab-btn.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--divine-purple);
+}
+
+/* ─── Footer ─── */
+.footer {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-family: 'Geist Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+}
+
+/* ─── Tooltip ─── */
+.tooltip-container {
+  position: relative;
+  cursor: help;
+}
+
+.tooltip-container .tooltip-text {
+  display: none;
+  position: absolute;
+  bottom: 120%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #222;
+  color: var(--text-primary);
+  padding: 0.5rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  z-index: 100;
+  border: 1px solid var(--border-glow);
+  font-family: 'Geist Mono', monospace;
+}
+
+.tooltip-container:hover .tooltip-text { display: block; }
+
+/* ─── Responsive ─── */
+@media (max-width: 900px) {
+  .header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+  .header-right { text-align: left; }
+  .controls { flex-direction: column; align-items: flex-start; }
+  .col-name { width: 30%; }
+  .col-vol { display: none; }
+  table { font-size: 0.7rem; }
+}
+
+@media (max-width: 600px) {
+  .summary-cards { grid-template-columns: 1fr 1fr; }
+  .app-container { padding: 1rem 0.75rem; }
+  .header-left h1 { font-size: 1.6rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="app-container">
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <h1>PoE Spread Analyzer</h1>
+      <div class="subtitle">Mirage League — Currency Arbitrage Scanner</div>
+    </div>
+    <div class="header-right">
+      <div class="status-line">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Connecting…</span>
+      </div>
+      <div class="divine-rate" id="divineRate"></div>
+    </div>
+  </header>
+
+  <!-- Summary Cards -->
+  <div class="summary-cards" id="summaryCards"></div>
+
+  <!-- Tabs -->
+  <div class="tab-bar" id="tabBar">
+    <button class="tab-btn active" data-tab="spreads">Spreads</button>
+    <button class="tab-btn" data-tab="arbitrage">Cross-Currency Arbitrage</button>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls" id="controls">
+    <div class="control-group">
+      <span class="control-label">Sort</span>
+      <div class="btn-group" id="sortGroup">
+        <button class="active" data-sort="spreadChaos">Spread (Chaos)</button>
+        <button data-sort="pctProfit">% Profit</button>
+        <button data-sort="volume">Volume</button>
+      </div>
+    </div>
+    <div class="control-group">
+      <span class="control-label">Currency</span>
+      <div class="btn-group" id="currencyFilter">
+        <button class="active" data-filter="all">All</button>
+        <button data-filter="chaos">Chaos</button>
+        <button data-filter="divine">Divine</button>
+      </div>
+    </div>
+    <div class="control-group">
+      <span class="control-label">Min Vol</span>
+      <input type="number" class="search-input min-volume-input" id="minVolume" value="50" min="0" step="10">
+    </div>
+    <input type="text" class="search-input" id="searchInput" placeholder="Search items…">
+  </div>
+
+  <!-- Table -->
+  <div id="tableContainer">
+    <div class="loading-state">
+      <div class="loading-spinner"></div>
+      <p>Fetching currency data from poeez.com…</p>
+    </div>
+  </div>
+
+  <footer class="footer">
+    Data from <a href="https://poeez.com" target="_blank" style="color:var(--divine-purple)">poeez.com</a> · Auto-refreshes hourly ·
+    Bid = price others will buy at (you sell) · Ask = price others will sell at (you buy)
+  </footer>
+</div>
+
+<script>
+const API_URL = 'https://poeez.com/api/Economy/pc/Mirage';
+const REFRESH_MS = 60 * 60 * 1000; // 1 hour
+
+let rawData = null;
+let divineInChaos = { bid: 0, ask: 0 };
+let processedItems = [];
+let arbItems = [];
+let currentTab = 'spreads';
+let sortKey = 'spreadChaos';
+let sortDir = 'desc';
+let currencyFilter = 'all';
+let searchQuery = '';
+let minVolume = 50;
+
+// ─── Data Fetching ───
+async function fetchData() {
+  setStatus('loading', 'Fetching data…');
+  try {
+    const res = await fetch(API_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    rawData = await res.json();
+    processData();
+    setStatus('ok', `Updated ${formatTime(rawData.timestamp)}`);
+  } catch (err) {
+    setStatus('error', `Error: ${err.message}`);
+    console.error(err);
+  }
+}
+
+function setStatus(state, text) {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  dot.className = 'status-dot' + (state === 'error' ? ' error' : state === 'loading' ? ' loading' : '');
+  txt.textContent = text;
+}
+
+function formatTime(ts) {
+  try { return new Date(ts).toLocaleString(); } catch { return ts; }
+}
+
+// ─── Formatting helper: turn a slug into a readable name ───
+function formatName(slug) {
+  return slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// ─── Core price interpretation ───
+// The API gives prices as ratios. For items worth multiple orbs, values are < 1
+// (e.g., 0.003 means 1/0.003 ≈ 333 chaos per item).
+// For bulk currencies worth less than 1 orb, values are > 1
+// (e.g., 20 means you get 20 items per chaos orb).
+//
+// In ALL cases:
+//   bid = rate at which buyers will buy (you sell to them)
+//   ask = rate at which sellers will sell (you buy from them)
+//
+// To get "price per item in orbs":
+//   If value >= 1: price_per_item = 1 / value
+//   If value < 1: price_per_item = 1 / value (same formula, just yields > 1)
+//
+// Actually, the bid/ask semantics from the user:
+//   For fractional (<1): bid of 0.333 → you sell 1 item for 1/0.333 = 3c
+//                         ask of 0.166 → you buy 1 item for 1/0.166 = 6c
+//   For whole (>=1):     bid of 20 → you sell 20 items for 1c (so per item = 1/20 = 0.05c)
+//                         ask of 12 → you buy 12 items for 1c (so per item = 1/12 = 0.083c)
+//
+// So in both cases: price_you_sell_at = 1/bid, price_you_buy_at = 1/ask
+// BUT: for the user, "bid" is what buyers pay (higher = better for seller)
+// and "ask" is what sellers want (lower = better for buyer).
+//
+// Wait — let's re-read the user's example carefully:
+//   al-hezmins-crest: chaos bid=0.333, ask=0.1666
+//   "dividing 1 by this number": bid → 1/0.333 = 3c, ask → 1/0.1666 = 6c
+//   "bid is 3 and ask is 6, spread is 3"
+//   So bid=3 is the LOWER price (what buyers offer), ask=6 is the HIGHER price (what sellers want)
+//   This means you BUY at bid price (3c) and SELL at ask... wait no.
+//
+//   Actually in POE trade: 
+//   bid = what buyers are willing to pay = you can sell to them at this price
+//   ask = what sellers are asking = you have to pay this to buy
+//   So buy_price = ask (higher), sell_price = bid (lower)
+//   Spread = ask - bid... but that's negative profit.
+//
+//   BUT the user said bid=3, ask=6, spread=3. And ask > bid.
+//   If you buy at 3 (bid) and sell at 6 (ask)... that's not how it normally works.
+//
+//   Let me re-read: "bid of 0.333 and ask of 0.1666"
+//   In poe.trade terms, the "bid" side has MORE items per chaos (0.333 vs 0.1666)
+//   meaning bid side is CHEAPER per item (3c vs 6c).
+//   
+//   On poeez: bid = bulk buyers offering to buy your items (they list: "I want your item, I pay X chaos each")
+//   ask = sellers listing items (they list: "I have item, I want Y chaos each")
+//   
+//   bid ratio higher (0.333) = cheaper per unit = what you'd get SELLING
+//   ask ratio lower (0.166) = more expensive per unit = what you'd pay BUYING
+//   
+//   So: you BUY at 1/ask = 6c, you SELL at 1/bid = 3c → that's a LOSS.
+//   But user says "3 chaos spread" implying profit...
+//
+//   Let me re-check with chromatic: bid=20, ask=12
+//   1/bid = 0.05c per chrome, 1/ask = 0.083c per chrome
+//   bid gives MORE chromes per chaos (20), ask gives FEWER (12)
+//   So bid side: someone will give you 20 chromes per chaos (or buy your chaos for 20 chromes)
+//   Ask side: someone will sell you 12 chromes per chaos
+//   
+//   You buy 12 chromes for 1c (ask side), then sell those 12 chromes...
+//   but on bid side people want 20 chromes per chaos, so 12 chromes < 20 needed.
+//   
+//   Hmm. Let me think about this differently.
+//   The "bid" and "ask" might be INVERTED from normal finance convention in POE.
+//   
+//   User says chromatic: "bid of 20 and ask of 12, this gives us an 8 chromatic orb split"
+//   If bid=20 means "people will sell you 20 chromes per chaos" and ask=12 means 
+//   "people will buy your chromes at 12 per chaos":
+//   Buy 20 chromes for 1c, sell 12 chromes for 1c, keep 8 chromes. THAT makes sense!
+//   
+//   So: bid = how many items you GET per orb spent (buy side)
+//       ask = how many items you GIVE per orb received (sell side)  
+//   Spread in bulk items = bid - ask = items profit per cycle
+//
+//   For fractional items: bid=0.333 → buy 1 for 3c, ask=0.1666 → sell 1 for 6c
+//   Buy at 3c, sell at 6c = 3c profit. ✓
+//
+//   So the convention is: 
+//     bid = what you can BUY for (cost to you)
+//     ask = what you can SELL for (what you receive)
+//   And: bid (raw) > ask (raw) always (for bulk), bid_price < ask_price (for per-item)
+//   
+//   Profit per item = sell_price - buy_price = (1/ask) - (1/bid) for fractional
+//   For bulk: you spend 1 orb, get bid items, sell ask items for 1 orb, keep (bid-ask) items
+
+function getPricePerItem(rawValue) {
+  // Converts raw API value to "price per item in that currency"
+  if (!rawValue || rawValue === 0) return Infinity;
+  return 1 / rawValue;
+}
+
+function processData() {
+  if (!rawData || !rawData.summary) return;
+
+  const summary = rawData.summary;
+
+  // Get divine orb rate
+  if (summary['divine'] && summary['divine'].chaos) {
+    const dc = summary['divine'].chaos;
+    // bid = buy divine for X chaos, ask = sell divine for X chaos
+    divineInChaos.buy = getPricePerItem(dc.bid);   // cost to buy a divine in chaos
+    divineInChaos.sell = getPricePerItem(dc.ask);   // what you get selling a divine for chaos
+  }
+
+  document.getElementById('divineRate').innerHTML =
+    `1 Divine = <span style="color:var(--profit-green)">${Math.round(divineInChaos.sell)}c</span> sell / <span style="color:var(--loss-red)">${Math.round(divineInChaos.buy)}c</span> buy`;
+
+  processedItems = [];
+  arbItems = [];
+
+  for (const [slug, item] of Object.entries(summary)) {
+    if (slug === 'divine' || slug === 'chaos') continue; // skip the orbs themselves
+
+    const name = formatName(slug);
+
+    // ─── Chaos spread ───
+    if (item.chaos && item.chaos.bid != null && item.chaos.ask != null && item.chaos.bid > 0 && item.chaos.ask > 0) {
+      const buyPrice = getPricePerItem(item.chaos.bid);   // cost to buy 1 item in chaos
+      const sellPrice = getPricePerItem(item.chaos.ask);  // revenue selling 1 item in chaos
+      const spread = sellPrice - buyPrice;
+      const pct = buyPrice > 0 ? (spread / buyPrice) * 100 : 0;
+
+      if (spread > 0 && isFinite(spread)) {
+        processedItems.push({
+          slug, name,
+          currency: 'chaos',
+          buyPrice, sellPrice,
+          spread,
+          spreadChaos: spread,
+          pctProfit: pct,
+          volume: item.chaos.volume || 0,
+          buyLabel: fmtPrice(buyPrice) + 'c',
+          sellLabel: fmtPrice(sellPrice) + 'c',
+          spreadLabel: fmtPrice(spread) + 'c',
+        });
+      }
+    }
+
+    // ─── Divine spread ───
+    if (item.divine && item.divine.bid != null && item.divine.ask != null && item.divine.bid > 0 && item.divine.ask > 0) {
+      const buyPrice = getPricePerItem(item.divine.bid);
+      const sellPrice = getPricePerItem(item.divine.ask);
+      const spread = sellPrice - buyPrice;
+      const pct = buyPrice > 0 ? (spread / buyPrice) * 100 : 0;
+      const spreadInChaos = spread * ((divineInChaos.buy + divineInChaos.sell) / 2);
+
+      if (spread > 0 && isFinite(spread)) {
+        processedItems.push({
+          slug, name,
+          currency: 'divine',
+          buyPrice, sellPrice,
+          spread,
+          spreadChaos: spreadInChaos,
+          pctProfit: pct,
+          volume: item.divine.volume || 0,
+          buyLabel: fmtPrice(buyPrice) + 'div',
+          sellLabel: fmtPrice(sellPrice) + 'div',
+          spreadLabel: fmtPrice(spread) + 'div',
+        });
+      }
+    }
+
+    // ─── Cross-currency arbitrage ───
+    // Buy with chaos, sell for divines (convert divines to chaos to see profit)
+    if (item.chaos && item.divine && item.chaos.bid > 0 && item.divine.ask > 0) {
+      const buyPriceChaos = getPricePerItem(item.chaos.bid);
+      const sellQtyPerDiv = item.divine.ask; // items you give per divine received
+      // If sellQtyPerDiv >= 1: you give sellQtyPerDiv items for 1 divine
+      // If sellQtyPerDiv < 1: you give 1 item for 1/sellQtyPerDiv divines
+      
+      let itemsNeeded, divinesReceived;
+      if (sellQtyPerDiv >= 1) {
+        itemsNeeded = sellQtyPerDiv;
+        divinesReceived = 1;
+      } else {
+        itemsNeeded = 1;
+        divinesReceived = 1 / sellQtyPerDiv;
+      }
+
+      const totalBuyCost = itemsNeeded * buyPriceChaos;
+      const totalSellRevenue = divinesReceived * divineInChaos.sell;
+      const arbProfit = totalSellRevenue - totalBuyCost;
+      const arbPct = totalBuyCost > 0 ? (arbProfit / totalBuyCost) * 100 : 0;
+
+      if (arbProfit > 0 && isFinite(arbProfit)) {
+        arbItems.push({
+          slug, name,
+          itemsNeeded: Math.round(itemsNeeded * 100) / 100,
+          divinesReceived: Math.round(divinesReceived * 100) / 100,
+          buyCostChaos: totalBuyCost,
+          sellRevenueChaos: totalSellRevenue,
+          profit: arbProfit,
+          pctProfit: arbPct,
+          volume: Math.min(item.chaos.volume || 0, item.divine.volume || 0),
+        });
+      }
+    }
+  }
+
+  renderSummaryCards();
+  renderTable();
+}
+
+function fmtPrice(v) {
+  if (v >= 1000) return Math.round(v).toLocaleString();
+  if (v >= 100) return Math.round(v).toString();
+  if (v >= 10) return v.toFixed(1);
+  if (v >= 1) return v.toFixed(2);
+  return v.toFixed(3);
+}
+
+// ─── Summary Cards ───
+function renderSummaryCards() {
+  const container = document.getElementById('summaryCards');
+  const chaosItems = processedItems.filter(i => i.currency === 'chaos');
+  const divineItems = processedItems.filter(i => i.currency === 'divine');
+
+  const topChaos = [...chaosItems].sort((a, b) => b.spreadChaos - a.spreadChaos)[0];
+  const topDivine = [...divineItems].sort((a, b) => b.spread - a.spread)[0];
+  const topPct = [...processedItems].filter(i => i.volume >= minVolume).sort((a, b) => b.pctProfit - a.pctProfit)[0];
+  const topArb = [...arbItems].filter(i => i.volume >= minVolume).sort((a, b) => b.profit - a.profit)[0];
+
+  container.innerHTML = `
+    <div class="summary-card chaos-card">
+      <div class="card-label">Best Chaos Spread</div>
+      <div class="card-value" style="color:var(--chaos-gold)">${topChaos ? fmtPrice(topChaos.spreadChaos) + 'c' : '—'}</div>
+      <div class="card-sub">${topChaos ? topChaos.name : ''}</div>
+    </div>
+    <div class="summary-card divine-card">
+      <div class="card-label">Best Divine Spread</div>
+      <div class="card-value" style="color:var(--divine-purple)">${topDivine ? fmtPrice(topDivine.spread) + ' div' : '—'}</div>
+      <div class="card-sub">${topDivine ? topDivine.name : ''}</div>
+    </div>
+    <div class="summary-card profit-card">
+      <div class="card-label">Highest % Profit</div>
+      <div class="card-value" style="color:var(--profit-green)">${topPct ? topPct.pctProfit.toFixed(0) + '%' : '—'}</div>
+      <div class="card-sub">${topPct ? topPct.name : ''}</div>
+    </div>
+    <div class="summary-card arb-card">
+      <div class="card-label">Best Chaos→Divine Arb</div>
+      <div class="card-value" style="color:var(--accent-cyan)">${topArb ? fmtPrice(topArb.profit) + 'c' : '—'}</div>
+      <div class="card-sub">${topArb ? topArb.name : ''}</div>
+    </div>
+  `;
+}
+
+// ─── Table Rendering ───
+function renderTable() {
+  const container = document.getElementById('tableContainer');
+
+  if (currentTab === 'spreads') {
+    renderSpreadsTable(container);
+  } else {
+    renderArbTable(container);
+  }
+}
+
+function renderSpreadsTable(container) {
+  let items = [...processedItems];
+
+  // Filter
+  if (currencyFilter !== 'all') items = items.filter(i => i.currency === currencyFilter);
+  if (searchQuery) items = items.filter(i => i.name.toLowerCase().includes(searchQuery) || i.slug.includes(searchQuery));
+  items = items.filter(i => i.volume >= minVolume);
+
+  // Sort
+  items.sort((a, b) => {
+    let va = a[sortKey], vb = b[sortKey];
+    return sortDir === 'desc' ? vb - va : va - vb;
+  });
+
+  const sortArrow = sortDir === 'desc' ? '▼' : '▲';
+
+  container.innerHTML = `
+    <div class="table-wrapper">
+      <div class="table-section-header">
+        Currency Spreads <span class="count-badge">${items.length} items</span>
+      </div>
+      <div style="max-height:70vh;overflow-y:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th class="col-name">Item</th>
+            <th class="col-type">Type</th>
+            <th class="col-num ${sortKey === 'buyPrice' ? 'sorted' : ''}" data-sort="buyPrice">
+              Buy Price <span class="sort-arrow">${sortKey === 'buyPrice' ? sortArrow : '▼'}</span>
+            </th>
+            <th class="col-num ${sortKey === 'sellPrice' ? 'sorted' : ''}" data-sort="sellPrice">
+              Sell Price <span class="sort-arrow">${sortKey === 'sellPrice' ? sortArrow : '▼'}</span>
+            </th>
+            <th class="col-spread ${sortKey === 'spreadChaos' ? 'sorted' : ''}" data-sort="spreadChaos">
+              Spread <span class="sort-arrow">${sortKey === 'spreadChaos' ? sortArrow : '▼'}</span>
+            </th>
+            <th class="col-pct ${sortKey === 'pctProfit' ? 'sorted' : ''}" data-sort="pctProfit">
+              % Profit <span class="sort-arrow">${sortKey === 'pctProfit' ? sortArrow : '▼'}</span>
+            </th>
+            <th class="col-vol ${sortKey === 'volume' ? 'sorted' : ''}" data-sort="volume">
+              Volume <span class="sort-arrow">${sortKey === 'volume' ? sortArrow : '▼'}</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.length === 0 ? '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-dim)">No items match filters</td></tr>' : ''}
+          ${items.map(i => `
+            <tr>
+              <td class="col-name"><span class="item-name">${i.name}</span></td>
+              <td class="col-type"><span class="currency-tag ${i.currency === 'chaos' ? 'tag-chaos' : 'tag-divine'}">${i.currency === 'chaos' ? 'CHAOS' : 'DIVINE'}</span></td>
+              <td class="col-num val-ask">${i.buyLabel}</td>
+              <td class="col-num val-bid">${i.sellLabel}</td>
+              <td class="col-spread val-spread-positive">${i.spreadLabel}</td>
+              <td class="col-pct"><span class="pct-badge ${i.pctProfit >= 100 ? 'pct-high' : i.pctProfit >= 30 ? 'pct-mid' : 'pct-low'}">${i.pctProfit.toFixed(0)}%</span></td>
+              <td class="col-vol" style="color:var(--text-secondary)">${i.volume.toLocaleString()}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  `;
+
+  // Bind sort clicks
+  container.querySelectorAll('th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      if (sortKey === key) sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+      else { sortKey = key; sortDir = 'desc'; }
+      renderTable();
+    });
+  });
+}
+
+function renderArbTable(container) {
+  let items = [...arbItems];
+
+  if (searchQuery) items = items.filter(i => i.name.toLowerCase().includes(searchQuery) || i.slug.includes(searchQuery));
+  items = items.filter(i => i.volume >= minVolume);
+
+  items.sort((a, b) => {
+    let va = a[sortKey === 'spreadChaos' ? 'profit' : sortKey === 'pctProfit' ? 'pctProfit' : 'volume'];
+    let vb = b[sortKey === 'spreadChaos' ? 'profit' : sortKey === 'pctProfit' ? 'pctProfit' : 'volume'];
+    return sortDir === 'desc' ? vb - va : va - vb;
+  });
+
+  const sk = sortKey === 'spreadChaos' ? 'profit' : sortKey === 'pctProfit' ? 'pctProfit' : 'volume';
+  const sortArrow = sortDir === 'desc' ? '▼' : '▲';
+
+  container.innerHTML = `
+    <div class="table-wrapper">
+      <div class="table-section-header">
+        Chaos → Divine Arbitrage <span class="count-badge">${items.length} items</span>
+      </div>
+      <div style="max-height:70vh;overflow-y:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th class="col-name">Item</th>
+            <th class="col-num">Buy Qty</th>
+            <th class="col-num ${sk === 'profit' ? 'sorted' : ''}" data-sort="profit">
+              Cost (c) <span class="sort-arrow">${sk === 'profit' ? sortArrow : '▼'}</span>
+            </th>
+            <th class="col-num">Sell → Div</th>
+            <th class="col-num">Revenue (c)</th>
+            <th class="col-spread ${sk === 'profit' ? 'sorted' : ''}" data-sort="profit">
+              Profit (c) <span class="sort-arrow">${sk === 'profit' ? sortArrow : '▼'}</span>
+            </th>
+            <th class="col-pct ${sk === 'pctProfit' ? 'sorted' : ''}" data-sort="pctProfit">
+              % Profit <span class="sort-arrow">${sk === 'pctProfit' ? sortArrow : '▼'}</span>
+            </th>
+            <th class="col-vol ${sk === 'volume' ? 'sorted' : ''}" data-sort="volume">
+              Volume <span class="sort-arrow">${sk === 'volume' ? sortArrow : '▼'}</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.length === 0 ? '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-dim)">No arbitrage opportunities found</td></tr>' : ''}
+          ${items.map(i => `
+            <tr>
+              <td class="col-name"><span class="item-name">${i.name}</span></td>
+              <td class="col-num" style="color:var(--text-secondary)">${fmtPrice(i.itemsNeeded)}</td>
+              <td class="col-num val-ask">${fmtPrice(i.buyCostChaos)}c</td>
+              <td class="col-num" style="color:var(--divine-purple)">${fmtPrice(i.divinesReceived)} div</td>
+              <td class="col-num val-bid">${fmtPrice(i.sellRevenueChaos)}c</td>
+              <td class="col-spread val-spread-positive">${fmtPrice(i.profit)}c</td>
+              <td class="col-pct"><span class="pct-badge ${i.pctProfit >= 100 ? 'pct-high' : i.pctProfit >= 30 ? 'pct-mid' : 'pct-low'}">${i.pctProfit.toFixed(0)}%</span></td>
+              <td class="col-vol" style="color:var(--text-secondary)">${i.volume.toLocaleString()}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  `;
+
+  container.querySelectorAll('th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      // Map arb sort keys back
+      const mappedKey = key === 'profit' ? 'spreadChaos' : key;
+      if (sortKey === mappedKey) sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+      else { sortKey = mappedKey; sortDir = 'desc'; }
+      renderTable();
+    });
+  });
+}
+
+// ─── Event Listeners ───
+document.getElementById('tabBar').addEventListener('click', e => {
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentTab = btn.dataset.tab;
+  renderTable();
+});
+
+document.getElementById('sortGroup').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-sort]');
+  if (!btn) return;
+  document.querySelectorAll('#sortGroup button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  sortKey = btn.dataset.sort;
+  sortDir = 'desc';
+  renderTable();
+});
+
+document.getElementById('currencyFilter').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-filter]');
+  if (!btn) return;
+  document.querySelectorAll('#currencyFilter button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currencyFilter = btn.dataset.filter;
+  renderTable();
+});
+
+document.getElementById('searchInput').addEventListener('input', e => {
+  searchQuery = e.target.value.toLowerCase().trim();
+  renderTable();
+});
+
+document.getElementById('minVolume').addEventListener('input', e => {
+  minVolume = parseInt(e.target.value) || 0;
+  renderSummaryCards();
+  renderTable();
+});
+
+// ─── Init ───
+fetchData();
+setInterval(fetchData, REFRESH_MS);
+</script>
+</body>
+</html>
